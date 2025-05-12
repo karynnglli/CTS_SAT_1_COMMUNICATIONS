@@ -202,7 +202,7 @@ class radio_ax100(gr.top_block, Qt.QWidget):
         self.qtgui_freq_sink_x_0 = qtgui.freq_sink_c(
             1024, #size
             window.WIN_FLATTOP, #wintype
-            freq, #fc
+            (freq-samp_rate/4), #fc
             samp_rate, #bw
             "", #name
             1,
@@ -320,7 +320,7 @@ class radio_ax100(gr.top_block, Qt.QWidget):
         self.set_iq_rate(self.samp_rate/self.ratio)
         self.set_ratio(2**int(math.log2(self.samp_rate/max(self.bw, self.baud_rate))))
         self.freq_xlating_fir_filter_xxx_0.set_center_freq((self.samp_rate/4))
-        self.qtgui_freq_sink_x_0.set_frequency_range(self.freq, self.samp_rate)
+        self.qtgui_freq_sink_x_0.set_frequency_range((self.freq-self.samp_rate/4), self.samp_rate)
         self.uhd_usrp_sink_0.set_samp_rate(self.samp_rate)
         self.uhd_usrp_source_0.set_samp_rate(self.samp_rate)
         self.uhd_usrp_source_0.set_center_freq(self.freq-self.samp_rate/4, 0)
@@ -400,7 +400,7 @@ class radio_ax100(gr.top_block, Qt.QWidget):
 
     def set_freq(self, freq):
         self.freq = freq
-        self.qtgui_freq_sink_x_0.set_frequency_range(self.freq, self.samp_rate)
+        self.qtgui_freq_sink_x_0.set_frequency_range((self.freq-self.samp_rate/4), self.samp_rate)
         self.uhd_usrp_sink_0.set_center_freq(self.freq, 0)
         self.uhd_usrp_source_0.set_center_freq(self.freq-self.samp_rate/4, 0)
 

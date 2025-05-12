@@ -500,7 +500,7 @@ blocks:
     color9: '"dark green"'
     comment: ''
     ctrlpanel: 'False'
-    fc: freq
+    fc: freq-samp_rate/4
     fftsize: '1024'
     freqhalf: 'True'
     grid: 'True'
