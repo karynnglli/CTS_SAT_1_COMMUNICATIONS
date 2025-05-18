@@ -180,33 +180,23 @@ class XTEAEngine:
         self.rkey = hashlib.sha1(key).digest()[0:16]
 
     def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:int=None):
-        ciper = xtea.new(self.rkey, mode=MODE_CTR)
+        ciper = xtea.new(self.rkey, mode=xtea.MODE_CTR)
         pass
-        
+
+    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:int=None):
+        pass
+
 class Packet:
     '''
     CSP packet
     | Field   | Length | Contents       |
     | ------- | ------ | -------------- |
     | Header  | 4B/6B  | V1: 4B, V2: 6B |
-    | Payload | N      |                |
+    | Payload | N      |                |
     | XTEA    | 4B     | seed           |
     | HMAC    | 4B     | digest         |
     | CRC     | 4B     | chksum         |
     '''
-    
-# int csp_xtea_set_key(const void * key, uint32_t keylen) {
-
-# 	/* Use SHA1 as KDF */
-# 	uint8_t hash[CSP_SHA1_DIGESTSIZE];
-# 	csp_sha1_memory(key, keylen, hash);
-
-# 	/* Copy key */
-# 	memcpy(csp_xtea_key, hash, XTEA_KEY_LENGTH);
-
-# 	return CSP_ERR_NONE;
-
-# }
     
     def __init__(self, 
                  src:int=0, dst:int=0, dport:int=0, sport:int=0,
@@ -222,6 +212,9 @@ class Packet:
                  crc_endian:Literal['big', 'little']='big',
                  exception:bool=False
                 ):
+        '''
+        leave hmac_key / xtea_key empty for transparent mode
+        '''
         self.header = HeaderV1(src, dst, dport, sport, 
                                prio=prio, flags=flags, endian=header_endian,
                                hmac=(hmac_key != None), xtea=(xtea_key != None),
@@ -232,9 +225,13 @@ class Packet:
         self.crc_include_header = crc_include_header
         self.exception = exception
         self.payload = payload
+        self.crcval = b''
     
     def __str__(self):
-        size = len(self.payload) + 4 * (self.header.hmac + self.header.crc)
+        xtea_en = self.header.xtea and self.xtea_engine
+        hmac_en = self.header.hmac and self.hmac_engine
+        size = len(self.payload) + 4 * (xtea_en + hmac_en + self.header.crc)
+        
         return 'Src %d, Dst %d, Dport %d, Sport %d, Pri %d, Flags %d, Size %d' % (
             self.header.src, self.header.dst, self.header.dport, self.header.sport,
             self.header.prio, self.header.flags, size)
@@ -242,12 +239,12 @@ class Packet:
     def encode(self) -> bytes:
         header = self.header.to_bytes()
         
-        if self.header.xtea:
-            payload = self.xtea_engine(self.payload)
+        if self.header.xtea and self.xtea_engine:
+            payload = self.xtea_engine.encrypt(self.payload)
         else:
             payload = self.payload
 
-        if self.header.hmac:
+        if self.header.hmac and self.hmac_engine:
             hmac = self.hmac_engine(payload)
         else:
             hmac = b''
@@ -279,8 +276,9 @@ class Packet:
                     raise ValueError('CRC ERROR')
                     
             self.payload = self.payload[:-4]
+            self.crcval = crc_val
         
-        if self.hmac_engine:
+        if self.header.hmac and self.hmac_engine:
             hmac_val = self.payload[-4:]
             if len(hmac_val) != 4:
                 if self.exception:
@@ -295,4 +293,5 @@ class Packet:
             self.payload = self.payload[:-4]
 
         # TODO: XTEA here
-
+        if self.header.xtea and self.xtea_engine:
+            self.payload = self.xtea_engine.decrypt(self.payload)
