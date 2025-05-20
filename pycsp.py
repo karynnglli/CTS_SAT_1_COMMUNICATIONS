@@ -1,4 +1,4 @@
-import hashlib, xtea, crc
+import xtea, random, hashlib, crc
 from typing import Literal, Union
 
 class HeaderV1:
@@ -177,14 +177,24 @@ class HMACEngine:
 class XTEAEngine:
     def __init__(self, key:bytes=b''):
         # Use SHA1 as KDF
-        self.rkey = hashlib.sha1(key).digest()[0:16]
+        rkey = hashlib.sha1(key).digest()[0:16]
+        self.nonce = bytes(0)
+        self.count = 0
 
-    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:int=None):
-        ciper = xtea.new(self.rkey, mode=xtea.MODE_CTR)
-        pass
+        def counter():
+            iv = self.nonce + self.count.to_bytes(4, 'big')
+            self.count += 1
+            return iv
 
-    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:int=None):
-        pass
+        self.ciper = xtea.new(rkey, mode=xtea.MODE_CTR, counter=counter)
+
+    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
+        self.nonce = nonce
+        self.count = 1
+        return self.ciper.encrypt(data)
+
+    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
+        return self.encrypt(data, nonce)
 
 class Packet:
     '''
@@ -193,9 +203,9 @@ class Packet:
     | ------- | ------ | -------------- |
     | Header  | 4B/6B  | V1: 4B, V2: 6B |
     | Payload | N      |                |
-    | XTEA    | 4B     | seed           |
-    | HMAC    | 4B     | digest         |
-    | CRC     | 4B     | chksum         |
+    | HMAC    | 4B     | sha1 digest    |
+    | CRC     | 4B     | crc checksum   |
+    | XTEA    | 4B     | xtea init vec  |
     '''
     
     def __init__(self, 
@@ -209,11 +219,11 @@ class Packet:
                  flags:int=0,
                  header_endian:Literal['big', 'little']='big',
                  crc_include_header:bool=False,
-                 crc_endian:Literal['big', 'little']='big',
+                 crc_endian:Literal['big', 'little']|None='big',
                  exception:bool=False
                 ):
         '''
-        leave hmac_key / xtea_key empty for transparent mode
+        set hmac_key=None, xtea_key=None, crc_endian=None for transparent mode
         '''
         self.header = HeaderV1(src, dst, dport, sport, 
                                prio=prio, flags=flags, endian=header_endian,
@@ -221,11 +231,10 @@ class Packet:
                                rdp=rdp, crc=crc)
         self.hmac_engine = None if hmac_key is None else HMACEngine(hmac_key)
         self.xtea_engine = None if xtea_key is None else XTEAEngine(xtea_key)
-        self.crc_engine = CRCEngine(endian=crc_endian)
+        self.crc_engine = None if crc_endian is None else CRCEngine(endian=crc_endian)
         self.crc_include_header = crc_include_header
         self.exception = exception
         self.payload = payload
-        self.crcval = b''
     
     def __str__(self):
         xtea_en = self.header.xtea and self.xtea_engine
@@ -239,59 +248,62 @@ class Packet:
     def encode(self) -> bytes:
         header = self.header.to_bytes()
         
-        if self.header.xtea and self.xtea_engine:
-            payload = self.xtea_engine.encrypt(self.payload)
-        else:
-            payload = self.payload
-
         if self.header.hmac and self.hmac_engine:
-            hmac = self.hmac_engine(payload)
-        else:
-            hmac = b''
+            payload += self.hmac_engine(payload)
             
-        if self.header.crc:
+        if self.header.crc and self.crc_engine:
             if self.crc_include_header:
-                crc = self.crc_engine(header + payload + hmac)
+                payload += self.crc_engine(header + payload)
             else:
-                crc = self.crc_engine(payload + hmac)
-        else:
-            crc = b''
+                payload += self.crc_engine(payload)
         
-        return header + payload + hmac + crc
+        if self.header.xtea and self.xtea_engine:
+            nonce = random.randint(0, 0xffffffff)
+            payload = self.xtea_engine.encrypt(self.payload, nonce) + nonce.to_bytes(4, 'big')
+        
+        return header + payload
 
     def decode(self, data:bytes):
         self.header = HeaderV1.from_bytes(data[0:4], self.header.endian)
         self.payload = data[4:]
         
-        if self.header.crc:
+        if self.header.xtea and self.xtea_engine:
+            nonce = self.payload[-4:]
+            if len(nonce) != 4:
+                self.payload = b''
+                if self.exception: raise ValueError('packet too short')
+                return
+            
+            self.payload = self.xtea_engine.decrypt(self.payload[:-4], nonce)
+
+        if self.header.crc and self.crc_engine:
             crc_val = self.payload[-4:]
             if len(crc_val) != 4:
-                if self.exception:
-                    self.payload = b''
-                    raise ValueError('packet too short')
+                self.payload = b''
+                if self.exception: raise ValueError('packet too short')
+                return
                 
             if crc_val != self.crc_engine(self.payload[:-4]):
+                self.payload = b''
                 if self.exception: 
-                    self.payload = b''
-                    raise ValueError('CRC ERROR')
+                    if self.header.xtea and self.xtea_engine:
+                        raise ValueError('CRC ERROR after decryption')
+                    else:
+                        raise ValueError('CRC ERROR')
+                return
                     
             self.payload = self.payload[:-4]
-            self.crcval = crc_val
         
         if self.header.hmac and self.hmac_engine:
             hmac_val = self.payload[-4:]
             if len(hmac_val) != 4:
-                if self.exception:
-                    self.payload = b''
-                    raise ValueError('packet too short')
-                    
+                self.payload = b''
+                if self.exception: raise ValueError('packet too short')
+                return
+
             if hmac_val != self.hmac_engine(self.payload[:-4]):
-                if self.exception: 
-                    self.payload = b''
-                    raise ValueError('HMAC ERROR')
+                self.payload = b''
+                if self.exception: raise ValueError('HMAC ERROR')
+                return
                     
             self.payload = self.payload[:-4]
-
-        # TODO: XTEA here
-        if self.header.xtea and self.xtea_engine:
-            self.payload = self.xtea_engine.decrypt(self.payload)
