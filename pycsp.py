@@ -147,17 +147,17 @@ class CRCEngine:
         return self.engine.checksum(x).to_bytes(4, self.endian)
 
 class HMACEngine:
-    CSP_SHA1_BLOCKSIZE = 64
-    CSP_SHA1_DIGESTSIZE = 20
+    BLOCKSIZE = 64
+    DIGESTSIZE = 20
 
     def __init__(self, key:bytes=b''):
         # Use SHA1 as KDF
         rkey = hashlib.sha1(key).digest()[0:16]
         
         # Normalize key to block size (64 bytes)
-        if len(rkey) > self.CSP_SHA1_BLOCKSIZE:
+        if len(rkey) > self.BLOCKSIZE:
             rkey = hashlib.sha1(rkey).digest()
-        rkey = rkey + b'\x00' * (self.CSP_SHA1_BLOCKSIZE - len(rkey))
+        rkey = rkey + b'\x00' * (self.BLOCKSIZE - len(rkey))
         
         # Prepare inner and outer padded keys
         self._ipad = bytes(b ^ 0x36 for b in rkey)
@@ -175,25 +175,30 @@ class HMACEngine:
         return outer.digest()[0:4]
 
 class XTEAEngine:
-    def __init__(self, key:bytes=b''):
+    def __init__(self, key:bytes=b'', legacy_unsafe:bool=False):
         # Use SHA1 as KDF
         rkey = hashlib.sha1(key).digest()[0:16]
-        self.nonce = bytes(0)
-        self.count = 0
+        self.legacy_unsafe = legacy_unsafe
 
         def counter():
             iv = self.nonce + self.count.to_bytes(4, 'big')
-            self.count += 1
+            if self.firstrun:
+                self.firstrun = False
+            else:
+                self.count += 1
+                self.count &= 0xffffffff
             return iv
 
         self.ciper = xtea.new(rkey, mode=xtea.MODE_CTR, counter=counter)
 
-    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
+    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes[4]):
+        assert len(nonce) == 4, 'len(nonce) must be 4'
         self.nonce = nonce
         self.count = 1
+        self.firstrun = self.legacy_unsafe
         return self.ciper.encrypt(data)
 
-    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
+    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes[4]):
         return self.encrypt(data, nonce)
 
 class Packet:
@@ -220,6 +225,7 @@ class Packet:
                  header_endian:Literal['big', 'little']='big',
                  crc_include_header:bool=False,
                  crc_endian:Literal['big', 'little']|None='big',
+                 xtea_legacy_unsafe:bool=False,
                  exception:bool=False
                 ):
         '''
@@ -230,7 +236,7 @@ class Packet:
                                hmac=(hmac_key != None), xtea=(xtea_key != None),
                                rdp=rdp, crc=crc)
         self.hmac_engine = None if hmac_key is None else HMACEngine(hmac_key)
-        self.xtea_engine = None if xtea_key is None else XTEAEngine(xtea_key)
+        self.xtea_engine = None if xtea_key is None else XTEAEngine(xtea_key, legacy_unsafe=xtea_legacy_unsafe)
         self.crc_engine = None if crc_endian is None else CRCEngine(endian=crc_endian)
         self.crc_include_header = crc_include_header
         self.exception = exception
@@ -239,7 +245,8 @@ class Packet:
     def __str__(self):
         xtea_en = self.header.xtea and self.xtea_engine
         hmac_en = self.header.hmac and self.hmac_engine
-        size = len(self.payload) + 4 * (xtea_en + hmac_en + self.header.crc)
+        crc_en = self.header.crc and self.crc_engine
+        size = len(self.payload) + 4 * (xtea_en + hmac_en + crc_en)
         
         return 'Src %d, Dst %d, Dport %d, Sport %d, Pri %d, Flags %d, Size %d' % (
             self.header.src, self.header.dst, self.header.dport, self.header.sport,
@@ -247,6 +254,7 @@ class Packet:
 
     def encode(self) -> bytes:
         header = self.header.to_bytes()
+        payload = self.payload
         
         if self.header.hmac and self.hmac_engine:
             payload += self.hmac_engine(payload)
