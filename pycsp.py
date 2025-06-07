@@ -248,7 +248,7 @@ class Packet:
         crc_en = self.header.crc and self.crc_engine
         size = len(self.payload) + 4 * (xtea_en + hmac_en + crc_en)
         
-        return 'Src %d, Dst %d, Dport %d, Sport %d, Pri %d, Flags %d, Size %d' % (
+        return 'Src %d, Dst %d, Dport %d, Sport %d, Pri %d, Flags 0x%d, Size %d' % (
             self.header.src, self.header.dst, self.header.dport, self.header.sport,
             self.header.prio, self.header.flags, size)
 

@@ -1,6 +1,11 @@
 import reed_solomon_ccsds as rs
 from pycsp import Packet, HMACEngine, CRCEngine
 from typing import Union
+import socket
+try:
+    import pyserial
+except:
+    pyserial = None
 
 class Golay24:
     N = 12
@@ -278,3 +283,78 @@ class AX100:
         packet.decode(data)
         return packet
 
+class KISS:
+    def __init__(self):
+        pass
+
+class GrcLink:
+    def __init__(self, host='127.0.0.1', port=52001, mtu=1024, timeout=1):
+        self.s = socket.create_connection((host, port))
+        self.mtu = mtu
+        self.timeout = timeout
+        self.s.settimeout(timeout)
+
+    def __del__(self):
+        self.close()
+    
+    def send(self, raw_data, data):
+        self.s.sendall(raw_data + data)
+
+    def recv(self):
+        return self.s.recv(self.mtu)
+
+    def close(self):
+        self.s.close()
+class Interface:
+    def __init__(self, name='', mtu=256, timeout=1):
+        self.mtu = mtu
+        self.timeout = timeout
+        self.name = name
+        
+    def send(self, pkt:Packet):
+        pass
+
+    def recv(self, timeout=None) -> Packet|None:
+        return None
+
+class Loopback(Interface):
+    def __init__(self, name='lo', mtu=65536, timeout=1, queue_limit=1024):
+        super().__init__(name, mtu, timeout)
+        self.queue = []
+        self.queue_limit = queue_limit
+    
+    def send(self, pkt:Packet):
+        if len(self.queue) >= self.queue_limit:
+            self.queue.pop(0)
+        self.queue.append(pkt)
+    
+    def recv(self, timeout=None):
+        try:
+            return self.queue.pop()
+        except:
+            return None
+
+def GrcAX100(Interface):
+    def __init__(self, name='radio', remote='127.0.0.1', port=52001, mtu=256, timeout=1):
+        pass
+
+def Tcp(Interface):
+    def __init__(self, name='tcp', remote='127.0.0.1', port=52001, listen=None, max_clients=0, mtu=65536, timeout=1):
+        '''
+        use listen='0.0.0.0' for tcp server mode
+        '''
+        pass
+
+def Udp(Interface):
+    def __init__(self, name='udp', 
+                 listen='127.0.0.1', port=2612, 
+                 remote=None, remote_port=2612, 
+                 mtu=65507, timeout=1):
+        pass
+
+def SerialKISS(Interface):
+    def __init__(self, name='serial', dev='/dev/ttyUSB0', baud=115200, mtu=256, timeout=1):
+        '''
+        use dev='tcp://127.0.0.1:2620' for tcp client mode
+        '''
+        pass
