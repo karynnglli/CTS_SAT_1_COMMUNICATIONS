@@ -56,10 +56,23 @@ nano ~/.bashrc
 source ~/.bashrc
 
 	Connect Hardware & Verify
-	Connect your B200 to a USB 3.0 port on your computer.
+	Connect your B200 to a USB 3.0 port on your computer and verify with uhd_find_devices command.
 	bash:
 
 uhd_find_devices
+
+	You should get something like this in response:
+
+[INFO] [UHD] linux; GNU C++ version 13.3.0; Boost_108300; UHD_4.9.0.0-0ubuntu1~noble3
+--------------------------------------------------
+-- UHD Device 0
+--------------------------------------------------
+Device Address:
+    serial: 315F298
+    name: MyB210
+    product: B210
+    type: b200
+
 
 
 Use pycsp_txt with properly installed dependices
@@ -91,4 +104,4 @@ pip install xtea
 pip install crc
 pip install reed_solomon_ccsds
 
-	Copy files from git repo into this folder
+	Copy files from git repo into this folder and then follow the instructions for getting the transciever up and running
