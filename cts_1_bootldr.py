@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+
+from easycsp_bootldr import Bootloader 
+
+PARAM_OFFSET   = 0x0800a000
+
+META_A_OFFSET  = 0x0800c000
+META_B_OFFSET  = 0x0800e000
+
+IMAGE_A_OFFSET = 0x08010000
+IMAGE_A_SIZE   = 0xf8000
+IMAGE_B_OFFSET = 0x08108000
+IMAGE_B_SIZE   = 0xf8000
+

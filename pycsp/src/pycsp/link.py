@@ -1,5 +1,5 @@
 import reed_solomon_ccsds as rs
-from pycsp import Packet, HMACEngine, CRCEngine
+from .packet import Packet, HMACEngine, CRCEngine
 from typing import Union
 import socket
 try:
@@ -287,7 +287,7 @@ class KISS:
     def __init__(self):
         pass
 
-class GrcLink:
+class GrcClient:
     def __init__(self, host='127.0.0.1', port=52001, mtu=1024, timeout=1):
         self.s = socket.create_connection((host, port))
         self.mtu = mtu
@@ -305,6 +305,7 @@ class GrcLink:
 
     def close(self):
         self.s.close()
+
 class Interface:
     def __init__(self, name='', mtu=256, timeout=1):
         self.mtu = mtu
@@ -334,24 +335,28 @@ class Loopback(Interface):
         except:
             return None
 
-def GrcAX100(Interface):
-    def __init__(self, name='radio', remote='127.0.0.1', port=52001, mtu=256, timeout=1):
-        pass
-
-def Tcp(Interface):
-    def __init__(self, name='tcp', remote='127.0.0.1', port=52001, listen=None, max_clients=0, mtu=65536, timeout=1):
+def TcpTun(Interface):
+    def __init__(self, name='tcptun0', 
+                 addr='127.0.0.1', port=52001, 
+                 server=False, 
+                 max_clients=0, 
+                 mtu=65536, timeout=1):
         '''
         use listen='0.0.0.0' for tcp server mode
         '''
         pass
 
-def Udp(Interface):
-    def __init__(self, name='udp', 
+def UdpTun(Interface):
+    def __init__(self, name='udptun0', 
                  listen='127.0.0.1', port=2612, 
                  remote=None, remote_port=2612, 
                  mtu=65507, timeout=1):
         pass
 
+def GrcAX100(Interface):
+    def __init__(self, name='radio', remote='127.0.0.1', port=52001, mtu=256, timeout=1):
+        pass
+    
 def SerialKISS(Interface):
     def __init__(self, name='serial', dev='/dev/ttyUSB0', baud=115200, mtu=256, timeout=1):
         '''

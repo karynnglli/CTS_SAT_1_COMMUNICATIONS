@@ -1,0 +1,26 @@
+[project]
+name = "pycsp"
+version = "0.0.1"
+description = ""
+authors = [
+    {name = "warmonkey",email = "luoshumymail@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.8, <4.0"
+dependencies = [
+    "reed-solomon-ccsds (>=1.0.3,<2.0.0)",
+    "xtea (>=0.7.1,<0.8.0)",
+    "crc (>=7.1.0,<8.0.0)"
+]
+
+[project.optional-dependencies]
+serial = [
+    "pyserial (>=3.5,<4.0)",
+]
+
+[tool.poetry]
+packages = [{include = "pycsp", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
