@@ -10,11 +10,11 @@ Parker suggested to look into the following protocols:
 
 | Feature | MQTT | HTTP | TCP
 |---|---|---|---|
-| Model | Publish/Subscribe | Request/Response | Connection-oriented |
-| Ideal For	| IoT & Low Bandwidth | Web & REST APIs | Data Streaming |
-| Overhead | Very Low | High (Header) | Moderate (Transport) |
-| Reliability | High (QoS) | High (via TCP) | High |
-| Payload | Binary (Flexible) | Text (usually) | Raw Binary |
+| **Model** | Publish/Subscribe | Request/Response | Connection-oriented |
+| **Ideal For**	| IoT & Low Bandwidth | Web & REST APIs | Data Streaming |
+| **Overhead** | Very Low | High (Header) | Moderate (Transport) |
+| **Reliability** | High (QoS) | High (via TCP) | High |
+| **Payload** | Binary (Flexible) | Text (usually) | Raw Binary |
 
 ## HTTP
 (HyperText Transfer Protocol)
