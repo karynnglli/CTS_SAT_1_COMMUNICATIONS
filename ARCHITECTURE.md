@@ -534,12 +534,12 @@ packet->data32[5] = htobe32(ack_delay_count);
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   TX Queue (global)                     │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐                 │
-│  │ packet  │  │ packet  │  │ packet  │  ...            │
-│  │ seq=100 │  │ seq=101 │  │ seq=102 │                 │
-│  │ conn=X  │  │ conn=X  │  │ conn=Y  │                 │
-│  │ ts=1000 │  │ ts=1050 │  │ ts=1100 │                 │
-│  └─────────┘  └─────────┘  └─────────┘                 │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐                  │
+│  │ packet  │  │ packet  │  │ packet  │  ...             │
+│  │ seq=100 │  │ seq=101 │  │ seq=102 │                  │
+│  │ conn=X  │  │ conn=X  │  │ conn=Y  │                  │
+│  │ ts=1000 │  │ ts=1050 │  │ ts=1100 │                  │
+│  └─────────┘  └─────────┘  └─────────┘                  │
 │                                                         │
 │  Operations:                                            │
 │  - Clone packet before TX, store in queue               │
