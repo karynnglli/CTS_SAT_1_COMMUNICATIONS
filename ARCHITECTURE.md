@@ -68,7 +68,7 @@ LibCSP (Cubesat Space Protocol) is a lightweight, embeddable network stack desig
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                            ROUTER                                     │  │
 │  │   ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐          │  │
-│  │   │ For me?     │───▶│ Port Binding │───▶│ Deliver to      │         │  │
+│  │   │ For me?     │───▶│ Port Binding │───▶│ Deliver to      │          │  │
 │  │   │ dst==myaddr │    │              │    │ socket/callback │          │  │
 │  │   └──────┬──────┘    └──────────────┘    └─────────────────┘          │  │
 │  │          │ No                                                         │  │
