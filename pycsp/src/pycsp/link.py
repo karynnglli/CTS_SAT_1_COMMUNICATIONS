@@ -1,6 +1,6 @@
 import reed_solomon_ccsds as rs
 from .packet import Packet, HMACEngine, CRCEngine
-from typing import Union
+from typing import Union, Optional
 import socket
 try:
     import pyserial
@@ -163,7 +163,12 @@ class CCSDSRxScrambler:
 class AX100:
     ASM = b'\x93\x0b\x51\xde'
     
-    def __init__(self, hmac_key:bytes=None, crc=False, reed_solomon=False, randomize=True, len_field=True, syncword=True, prefill=32, tailfill=1, exception=False, verbose=False):
+    def __init__(self,
+                 hmac_key:Optional[bytes]=None,
+                 crc:bool=False,
+                 reed_solomon:bool=False,
+                 randomize:bool=True,
+                 len_field=True, syncword=True, prefill=32, tailfill=1, exception=False, verbose=False):
         self.hmac_engine = HMACEngine(hmac_key) if not hmac_key is None else None
         self.crc_engine = CRCEngine() if crc else None
         self.reed_solomon = reed_solomon
@@ -178,14 +183,16 @@ class AX100:
     def encode(self, packet:Union[Packet, bytes, bytearray, memoryview]) -> bytes:
         if isinstance(packet, Packet):
             x = packet.encode()
+        elif isinstance(packet, memoryview):
+            x = bytes(packet)
         else:
             x = packet
 
         if self.hmac_engine:
-            x = x + self.hmac_engine(x)
+            x += self.hmac_engine(x)
 
         if self.crc_engine:
-            x = x + self.crc_engine(x)
+            x += self.crc_engine(x)
 
         if self.reed_solomon:
             padding = 0
@@ -335,31 +342,45 @@ class Loopback(Interface):
         except:
             return None
 
-def TcpTun(Interface):
-    def __init__(self, name='tcptun0', 
-                 addr='127.0.0.1', port=52001, 
-                 server=False, 
-                 max_clients=0, 
-                 mtu=65536, timeout=1):
-        '''
-        use listen='0.0.0.0' for tcp server mode
-        '''
-        pass
+# Import transport implementations
+# Note: TcpTun is implemented in transport.py
+# UdpTun, GrcAX100, and SerialKISS are stubs for future implementation
 
-def UdpTun(Interface):
-    def __init__(self, name='udptun0', 
-                 listen='127.0.0.1', port=2612, 
-                 remote=None, remote_port=2612, 
+class UdpTun(Interface):
+    """UDP tunnel interface (stub - not yet implemented)."""
+    def __init__(self, name='udptun0',
+                 listen='127.0.0.1', port=2612,
+                 remote=None, remote_port=2612,
                  mtu=65507, timeout=1):
+        raise NotImplementedError("UdpTun not yet implemented - use TcpTun instead")
+
+    def send(self, pkt):
         pass
 
-def GrcAX100(Interface):
-    def __init__(self, name='radio', remote='127.0.0.1', port=52001, mtu=256, timeout=1):
+    def recv(self, timeout=None):
         pass
-    
-def SerialKISS(Interface):
+
+class GrcAX100(Interface):
+    """GNU Radio AX100 interface (stub - not yet implemented)."""
+    def __init__(self, name='radio', remote='127.0.0.1', port=52001, mtu=256, timeout=1):
+        raise NotImplementedError("GrcAX100 not yet implemented")
+
+    def send(self, pkt):
+        pass
+
+    def recv(self, timeout=None):
+        pass
+
+class SerialKISS(Interface):
+    """Serial KISS interface (stub - not yet implemented)."""
     def __init__(self, name='serial', dev='/dev/ttyUSB0', baud=115200, mtu=256, timeout=1):
         '''
         use dev='tcp://127.0.0.1:2620' for tcp client mode
         '''
+        raise NotImplementedError("SerialKISS not yet implemented")
+
+    def send(self, pkt):
+        pass
+
+    def recv(self, timeout=None):
         pass
