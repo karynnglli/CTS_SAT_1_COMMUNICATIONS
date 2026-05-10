@@ -1,5 +1,5 @@
 import xtea, random, hashlib, crc
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 
 class HeaderV1:
     '''
@@ -28,11 +28,11 @@ class HeaderV1:
     def __init__(self, src:int, dst: int, dport: int, sport: int,
                  prio:int|Literal['critical', 'high', 'norm', 'low']='norm',
                  flags:int=0, 
-                 endian:Literal['big', 'little']='big',
-                 hmac:bool=None, 
-                 xtea:bool=None, 
-                 rdp:bool=None, 
-                 crc:bool=None):
+                 endian:Literal['little', 'big']='big',
+                 hmac:Optional[bool]=None, 
+                 xtea:Optional[bool]=None, 
+                 rdp:Optional[bool]=None, 
+                 crc:Optional[bool]=None):
         # Validate fields
         assert 0 <= src   <= 31, 'src addr must be 0..31'
         assert 0 <= dst   <= 31, 'dst addr must be 0..31'
@@ -57,10 +57,10 @@ class HeaderV1:
         if not rdp is None:  self.rdp = rdp
         if not crc is None:  self.crc = crc
         
-        self.endian = endian
+        self.endian:Literal['little', 'big'] = endian
 
     @classmethod
-    def from_bytes(cls, b:bytes, endian:str='big') -> 'CSP.HeaderV1':
+    def from_bytes(cls, b:bytes, endian:Literal['little', 'big']='big') -> 'CSP.HeaderV1':
         '''
         Parse a 4-byte CSP header (V1)
         '''
@@ -191,14 +191,14 @@ class XTEAEngine:
 
         self.ciper = xtea.new(rkey, mode=xtea.MODE_CTR, counter=counter)
 
-    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes[4]):
+    def encrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
         assert len(nonce) == 4, 'len(nonce) must be 4'
         self.nonce = nonce
         self.count = 1
         self.firstrun = self.legacy_unsafe
         return self.ciper.encrypt(data)
 
-    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes[4]):
+    def decrypt(self, data:Union[bytes, bytearray, memoryview], nonce:bytes):
         return self.encrypt(data, nonce)
 
 class Packet:
@@ -217,14 +217,14 @@ class Packet:
                  src:int=0, dst:int=0, dport:int=0, sport:int=0,
                  prio:int|Literal['critical', 'high', 'norm', 'low']='norm',
                  payload:bytes=b'',
-                 hmac_key:bytes=None, 
-                 xtea_key:bytes=None, 
-                 rdp:bool=None, 
-                 crc:bool=None,
+                 hmac_key:Optional[bytes]=None, 
+                 xtea_key:Optional[bytes]=None, 
+                 rdp:Optional[bool]=None, 
+                 crc:Optional[bool]=None,
                  flags:int=0,
                  header_endian:Literal['big', 'little']='big',
                  crc_include_header:bool=False,
-                 crc_endian:Literal['big', 'little']|None='big',
+                 crc_endian:Optional[Literal['big', 'little']]='big',
                  xtea_legacy_unsafe:bool=False,
                  exception:bool=False
                 ):
@@ -246,7 +246,7 @@ class Packet:
         xtea_en = self.header.xtea and self.xtea_engine
         hmac_en = self.header.hmac and self.hmac_engine
         crc_en = self.header.crc and self.crc_engine
-        size = len(self.payload) + 4 * (xtea_en + hmac_en + crc_en)
+        size = len(self.payload) + 4 * (bool(xtea_en) + bool(hmac_en) + bool(crc_en))
         
         return 'Src %d, Dst %d, Dport %d, Sport %d, Pri %d, Flags 0x%d, Size %d' % (
             self.header.src, self.header.dst, self.header.dport, self.header.sport,
@@ -266,8 +266,8 @@ class Packet:
                 payload += self.crc_engine(payload)
         
         if self.header.xtea and self.xtea_engine:
-            nonce = random.randint(0, 0xffffffff)
-            payload = self.xtea_engine.encrypt(self.payload, nonce) + nonce.to_bytes(4, 'big')
+            nonce = random.randint(0, 0xffffffff).to_bytes(4, 'big')
+            payload = self.xtea_engine.encrypt(self.payload, nonce) + nonce
         
         return header + payload
 

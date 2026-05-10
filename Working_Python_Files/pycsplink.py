@@ -1,7 +1,8 @@
 import reed_solomon_ccsds as rs
 from pycsp import Packet, HMACEngine, CRCEngine
-from typing import Union
+from typing import Union, Optional
 import socket
+import asyncio
 try:
     import pyserial
 except:
@@ -163,7 +164,7 @@ class CCSDSRxScrambler:
 class AX100:
     ASM = b'\x93\x0b\x51\xde'
     
-    def __init__(self, hmac_key:bytes=None, crc=False, reed_solomon=False, randomize=True, len_field=True, syncword=True, prefill=32, tailfill=1, exception=False, verbose=False):
+    def __init__(self, hmac_key:Optional[bytes]=None, crc=False, reed_solomon=False, randomize=True, len_field=True, syncword=True, prefill=32, tailfill=1, exception=False, verbose=False):
         self.hmac_engine = HMACEngine(hmac_key) if not hmac_key is None else None
         self.crc_engine = CRCEngine() if crc else None
         self.reed_solomon = reed_solomon
@@ -179,7 +180,7 @@ class AX100:
         if isinstance(packet, Packet):
             x = packet.encode()
         else:
-            x = packet
+            x = bytes(packet)
 
         if self.hmac_engine:
             x = x + self.hmac_engine(x)
@@ -210,7 +211,7 @@ class AX100:
         
         return self.prefill*b'\xaa' + x + self.tailfill*b'\xaa'
 
-    def decode(self, data:Union[bytes, bytearray, memoryview]) -> Packet|None:
+    def decode(self, data:Union[bytes, bytearray, memoryview]) -> Optional[Packet]:
         if self.syncword:
             if self.verbose: 
                 if data[0:4] != self.ASM: print('ASM ERROR')
@@ -234,8 +235,9 @@ class AX100:
                 if self.exception: raise ValueError('packet too short')
                 return None
             
-            if len(data) > 255:
-                data = data[255:]
+            if len(data) >= 255:
+                padding = 0
+                data = data[:255]
             else:
                 padding = 255 - len(data)
                 data = bytes(padding) + data
@@ -288,23 +290,26 @@ class KISS:
         pass
 
 class GrcLink:
-    def __init__(self, host='127.0.0.1', port=52001, mtu=1024, timeout=1):
-        self.s = socket.create_connection((host, port))
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, mtu=1024):
+        self.reader = reader
+        self.writer = writer
         self.mtu = mtu
-        self.timeout = timeout
-        self.s.settimeout(timeout)
 
-    def __del__(self):
-        self.close()
-    
-    def send(self, raw_data, data):
-        self.s.sendall(raw_data + data)
+    @classmethod
+    async def connect(cls, addr='127.0.0.1', port=52001, mtu=1024):
+        reader, writer = await asyncio.open_connection(addr, port)
+        return cls(reader, writer, mtu)
 
-    def recv(self):
-        return self.s.recv(self.mtu)
+    async def send(self, data: bytes):
+        self.writer.write(data)
+        await self.writer.drain()
+
+    async def recv(self) -> bytes:
+        return await self.reader.read(self.mtu)
 
     def close(self):
-        self.s.close()
+        self.writer.close()
+        
 class Interface:
     def __init__(self, name='', mtu=256, timeout=1):
         self.mtu = mtu
@@ -314,7 +319,7 @@ class Interface:
     def send(self, pkt:Packet):
         pass
 
-    def recv(self, timeout=None) -> Packet|None:
+    def recv(self, timeout=None) -> Optional[Packet]:
         return None
 
 class Loopback(Interface):
