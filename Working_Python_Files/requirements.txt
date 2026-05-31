@@ -1,3 +1,0 @@
-xtea
-crc
-reed-solomon-ccsds
